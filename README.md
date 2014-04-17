@@ -84,6 +84,9 @@ $response->setRequest($request); // Response uses request to negotiate content t
 $app->set('viewManager', $viewMgr = new \Phpf\ViewManager($filesystem)); // ViewManager uses filesystem to locate views
 $viewMgr->setEvents($events); // ViewManager uses events to call actions before rending views.
 
-// [Optional] set filesystem directory paths
-$filesystem->add(VIEWS, 'views', 2); // VIEWS set in Env; 'views' is group to place path under; '2' is recursion depth to use when searching for files in the directory.
+// [Optional] add filesystem directories
+// 'VIEWS' is set in Env
+// 'views' is group name, referenced when finding files
+// '2' is recursion depth to use when searching for files in the directory.
+$filesystem->add(VIEWS, 'views', 2);
 ```
