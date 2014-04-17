@@ -1,0 +1,26 @@
+{
+	"name": "phpf/micro",
+	"type": "library",
+	"description": "PHP micro-framework using Phpf components.",
+	"keywords": ["Micro-framework", "Framework"],
+	"homepage": "https://github.com/phpf/Micro",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "The PHPf Developer",
+			"email": "wellspeterson@live.com"
+		}
+	],
+	"require": {
+		"php": ">=5.3",
+		"ext-pdo": "*",
+		"wells5609/php-util": "dev-master",
+		"phpf/httputil": "dev-master"
+	},
+	"autoload": {
+		"psr-4": {
+			"Phpf\\": "src/"
+		}
+	},
+	"minimum-stability": "dev"
+}
