@@ -59,8 +59,6 @@ Use the aliases to instantiate component object (see `Phpf\App::configure()` for
 A component-loading procedure might look this:
 
 ```php
-// in some file using $app...
-
 $app->startCache('Cache'); // string => singleton ('Cache' is an alias for 'Phpf\Cache').
 
 $app->set('session', $session = new \Session);
@@ -90,3 +88,22 @@ $viewMgr->setEvents($events); // ViewManager uses events to call actions before 
 // '2' is recursion depth to use when searching for files in the directory.
 $filesystem->add(VIEWS, 'views', 2);
 ```
+
+Now you'll need to include some files to operate on the components (for example, adding routes, setting database table schemas, etc.). For modularity, it is recommended that you create a separate file for each component - e.g. "routes.php", "database.php", etc. but it's totally up to you. 
+
+After including these files, there's only a couple steps left. First, we dispatch the request:
+
+```php
+$app->router->dispatch($app['request'], $app['response']);
+```
+
+You may notice that the application components can be accessed using object (`->`) or array (`[]`) syntax. You can also use the `get()` method, which will return a component of the name given, if it exists.
+
+When the router finds a matching route, it instantiates the route controller and provides the controller with the Request and Response objects (and any others you add via `dispatch` events) as properties ('request' and 'response', respectively). It then calls the route controller's callback method, in which it populates the response body.
+
+With the response populated, we simply send it to the user:
+```php
+$app->response->send();
+```
+
+And that's it.
