@@ -31,8 +31,11 @@ class Schema
 		foreach ( $args as $key => $value ) {
 			$this->$key = $value;
 		}
-
-		if (! isset($this->table_basename)) {
+		
+		if (isset($this->name)) {
+			$this->table_basename = $this->name;
+			unset($this->name);
+		} else if (! isset($this->table_basename)) {
 			throw new RuntimeException('Must set TableSchema property $table_basename.');
 		}
 	}

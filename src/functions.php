@@ -131,7 +131,8 @@ function trigger($event/**[, $arg1 [, ...]]*/) {
  * Add a route.
  */
 function route($uri, $controller, $action, array $methods = array('GET', 'HEAD', 'POST', 'PUT', 'DELETE')) {
-	\Phpf\App::instance()->get('router')->addRoute($uri, array('controller' => $controller, 'action' => $action, 'methods' => $methods));
+	\Phpf\App::instance()->get('router')
+		->addRoute($uri, array('controller' => $controller, 'action' => $action, 'methods' => $methods));
 }
 
 /**

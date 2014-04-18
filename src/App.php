@@ -17,18 +17,18 @@ class App implements ArrayAccess, Countable {
 	protected static $instances = array();
 	
 	/**
-	 * Returns object instance (multiton). 
-	 * The default ID will be used if none is given. Thus, for only one 
-	 * instance, this class is effectively a singleton. 
+	 * Returns object instance.
 	 * 
 	 * @throws RuntimeException if no instance with given ID
 	 * @param string $id Application ID
 	 * @return \App
 	 */
 	public static function instance($id = self::DEFAULT_ID) {
+			
 		if (! isset(static::$instances[$id])) {
 			throw new RuntimeException("No application set.");
 		}
+		
 		return static::$instances[$id];
 	}
 	
@@ -53,7 +53,7 @@ class App implements ArrayAccess, Countable {
 			'timezone'	=> 'UTC',
 			'debug' 	=> false,
 			'dirs' => array(
-				'app'		=> 'app',
+				'app'		=> 'app', // relative to root
 				'library'	=> 'app/library',
 				'module'	=> 'app/modules',
 				'views'		=> 'app/views',
@@ -151,23 +151,19 @@ class App implements ArrayAccess, Countable {
 		// set Config object
 		$this->set('config', new \Config($config));
 		
-		// give app namespace an autoloader
-		Common\Autoloader::instance($this->namespace, dirname(APP))->register();
+		autoloader_register($this->namespace, dirname(APP));
 	}
 	
-	/**
-	 * Sets the application namespace property and defines 'APP_NAMESPACE'.
-	 * 
-	 * @param string $namespace Namespace
-	 * @return $this
-	 */
 	public function setNamespace($namespace) {
+			
 		$this->namespace = trim($namespace, '\\');
+		
 		/**
 		 * Application namespace
 		 * @var string
 		 */
 		define('APP_NAMESPACE', $this->namespace);
+		
 		return $this;
 	}
 	
@@ -178,13 +174,6 @@ class App implements ArrayAccess, Countable {
 	 */
 	public function getNamespace() {
 		return $this->namespace;
-	}
-	
-	/**
-	 * Load the functions.php file.
-	 */
-	public function loadFunctions() {
-		require_once __DIR__ . '/functions.php';
 	}
 	
 	/**
@@ -292,7 +281,7 @@ class App implements ArrayAccess, Countable {
 	 * @param string $cache Classname to use for Cache (singleton).
 	 * @return \Cache
 	 */
-	public function startCache($cache) {
+	public function startCache($cache = 'Cache') {
 		
 		$this->setSingleton('cache', $cache); // set the class
 		$cache = $this->get('cache'); // get the object

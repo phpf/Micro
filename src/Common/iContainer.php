@@ -14,6 +14,6 @@ interface iContainer {
 	
 	public function import($data);
 	
-	public function toArray();
+	public function toArray($indexed = false);
 	
 }

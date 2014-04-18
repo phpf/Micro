@@ -139,10 +139,9 @@ class Container implements ArrayAccess, Countable, IteratorAggregate, iContainer
 	/**
 	 * Returns object properties as array.
 	 * [iContainer]
-	 * @uses get_object_vars()
 	 */
-	public function toArray() {
-		return get_object_vars($this);
+	public function toArray($indexed = false) {
+		return iterator_to_array($this, !$indexed);
 	}
 	
 	/**

@@ -121,8 +121,8 @@ class DataContainer extends Container
 	 * Returns data array.
 	 * [iContainer]
 	 */
-	public function toArray() {
-		return $this->data;
+	public function toArray($indexed = false) {
+		return $indexed ? array_values($this->data) : $this->data;
 	}
 	
 	/**
