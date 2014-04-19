@@ -65,6 +65,13 @@ function autoloader_register($namespace, $path) {
 	}
 }
 
+/**
+ * Returns an autoloader instance for a namespace.
+ */
+function autoloader($namespace) {
+	return \Phpf\Common\Autoloader::instance($namespace);
+}
+
 /** ============================
 	B. Session
 ============================= */
