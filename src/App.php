@@ -48,6 +48,7 @@ class App implements ArrayAccess, Countable {
 		
 		// Merge user config and defaults
 		$config = array_replace_recursive(array(
+			'root' 		=> './', // root directory path
 			'namespace'	=> 'App',
 			'charset'	=> 'UTF-8',
 			'timezone'	=> 'UTC',
@@ -122,6 +123,14 @@ class App implements ArrayAccess, Countable {
 	}
 	
 	/**
+	 * Includes framework functions.
+	 * @return void
+	 */
+	public static function loadFunctions() {
+		require_once __DIR__ . '/functions.php';
+	}
+	
+	/**
 	 * Construct the application
 	 * 
 	 * @param array|ArrayAccess Config array/object
@@ -151,7 +160,9 @@ class App implements ArrayAccess, Countable {
 		// set Config object
 		$this->set('config', new \Config($config));
 		
-		autoloader_register($this->namespace, dirname(APP));
+		$autoloader = Common\Autoloader::instance($this->namespace);
+		$autoloader->setPath(dirname(APP));
+		$autoloader->register();
 	}
 	
 	public function setNamespace($namespace) {

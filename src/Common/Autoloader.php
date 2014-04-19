@@ -22,15 +22,14 @@ class Autoloader
 
 	protected static $instances = array();
 
-	public static function instance($namespace, $path = null) {
+	public static function instance($namespace) {
 		if (! isset(static::$instances[$namespace]))
-			static::$instances[$namespace] = new static($namespace, $path);
+			static::$instances[$namespace] = new static($namespace);
 		return static::$instances[$namespace];
 	}
 
-	protected function __construct($namespace, $path = null) {
+	protected function __construct($namespace) {
 		$this->setNamespace($namespace);
-		$this->setPath($path);
 	}
 
 	public function setNamespace($namespace) {
@@ -90,6 +89,10 @@ class Autoloader
 	}
 
 	public function register() {
+		if (! isset($this->path)) {
+			throw new \RuntimeException("No path set - cannot register.");
+			return $this;
+		}
 		spl_autoload_register(array($this, 'load'));
 		$this->isRegistered = true;
 		return $this;

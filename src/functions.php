@@ -59,10 +59,9 @@ function package($uid) {
  * Registers an autoloader for given namespace.
  */
 function autoloader_register($namespace, $path) {
-	$loader = \Phpf\Common\Autoloader::instance($namespace, rtrim($path, '/\\'));
-	if (! $loader->isRegistered()) {
-		$loader->register();
-	}
+	$loader = \Phpf\Common\Autoloader::instance($namespace);
+	$loader->setPath($path);
+	$loader->register();
 }
 
 /**
