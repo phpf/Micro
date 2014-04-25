@@ -74,9 +74,9 @@ class Callback
 
 			if (isset($params[$name])) {
 				$parameters[$name] = $params[$name];
-			} elseif (self::CLOSURE === $this->type && isset($params[$i])) {
+			} else if (isset($params[$i])) {
 				$parameters[$name] = $params[$i];
-			} elseif ($rParam->isDefaultValueAvailable()) {
+			} else if ($rParam->isDefaultValueAvailable()) {
 				$parameters[$name] = $rParam->getDefaultValue();
 			} else {
 				throw new Exception\MissingParam("Missing reflection parameter '$name'");

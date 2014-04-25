@@ -35,40 +35,57 @@
 ================================= */
 
 /**
- * Retrieve an application component.
- */
-function component($name) {
-	return \Phpf\App::instance()->get($name);
-}
-
-/**
  * Create a (lazy) class alias.
+ * 
+ * @param string $class Fully resolved classname for which to create an alias.
+ * @param string $alias Alias for the class given in first parameter.
+ * @return void
  */
 function alias($class, $alias) {
 	\Phpf\App::instance()->alias($class, $alias);
 }
 
 /**
+ * Retrieve an application component.
+ * 
+ * @param string $name Component name (e.g. "router", "filesystem", etc.)
+ * @return object Component object if found, otherwise null.
+ */
+function component($name) {
+	return \Phpf\App::instance()->get($name);
+}
+
+/**
  * Retrieve a package object.
+ * 
+ * @param string $uid Package UID in format "{Type}.{ID}" (e.g. "library.menus")
+ * @return \Phpf\Package\PackageInterface|null Package object if found, otherwise null.
  */
 function package($uid) {
 	return \Phpf\App::instance()->get('packageManager')->get($uid);
 }
 
 /**
- * Registers an autoloader for given namespace.
+ * Returns an autoloader instance for a given namespace.
+ * 
+ * @param string $namespace Namespace for which to retrieve an autoloader.
+ * @return \Phpf\Common\Autoloader The autoloader instance for the given namespace.
+ */
+function autoloader($namespace) {
+	return \Phpf\Common\Autoloader::instance($namespace);
+}
+
+/**
+ * Registers an autoloader for a given namespace and directory.
+ * 
+ * @param string $namespace Namespace for which to register an autoloader.
+ * @param string $path Filesystem directory path that holds classes of given namespace.
+ * @return void
  */
 function autoloader_register($namespace, $path) {
 	$loader = \Phpf\Common\Autoloader::instance($namespace);
 	$loader->setPath($path);
 	$loader->register();
-}
-
-/**
- * Returns an autoloader instance for a namespace.
- */
-function autoloader($namespace) {
-	return \Phpf\Common\Autoloader::instance($namespace);
 }
 
 /** ============================
@@ -156,7 +173,6 @@ function endpoint($path, Closure $closure) {
  * Creates and registers a database table schema.
  */
 function db_table_schema($name, array $columns, $primary_key = 'id', array $unique_keys = null, array $keys = null){
-	
 	$schema = array(
 		'table_basename' => $name,
 		'columns' => array(),
@@ -164,11 +180,9 @@ function db_table_schema($name, array $columns, $primary_key = 'id', array $uniq
 		'unique_keys' => array(),
 		'keys' => array()
 	);
-	
 	foreach($columns as $col => $dtype){
 		$schema['columns'][$col] = strtolower($dtype);
 	}
-	
 	if ( isset($unique_keys) ){
 		foreach($unique_keys as $idx => $key){
 			if (is_numeric($idx)){
@@ -178,7 +192,6 @@ function db_table_schema($name, array $columns, $primary_key = 'id', array $uniq
 			}
 		}
 	}
-	
 	if ( isset($keys) ){
 		foreach($keys as $idx => $key){
 			if (is_numeric($idx)){
@@ -188,7 +201,6 @@ function db_table_schema($name, array $columns, $primary_key = 'id', array $uniq
 			}
 		}
 	}
-	
 	return db_register_schema($schema);
 }
 		
@@ -202,23 +214,10 @@ function db_register_schema( array $data ){
 	}
 	return false;
 }
-	
-/**
- * Returns a Schema instance
- */
-function db_get_schema($name) {
-	return \Phpf\Database::instance()->schema($name);	
-}
-
-/**
- * Returns a Table instance
- */
-function db_get_table($name) {
-	return \Phpf\Database::instance()->table($name);	
-}
 
 /**
  * Returns array of installed table names.
+ * Performs a DB query each time function is called.
  */
 function db_get_installed_tables() {
 	return \Phpf\Database::instance()->getInstalledTables();
@@ -356,7 +355,7 @@ function str_format($string, $template) {
  * Generate a random string from one of several of character pools.
  *
  * @param int $length Length of the returned random string (default 16)
- * @param string $charlist Type of characters - {@see Phpf\Util\Rand} constants.
+ * @param string $charlist Type of characters - @see Phpf\Util\Rand constants.
  * @return string A random string
  */
 function str_rand($length = 16, $charlist = 'alnum') {
@@ -364,7 +363,7 @@ function str_rand($length = 16, $charlist = 'alnum') {
 }
 
 /**
- * Converts a string to a PEAR-like class name. (e.g. "View_Template_Controller")
+ * Converts a string to a PEAR-like class name. (e.g. "HTTP_Request2_Response")
  */
 function str_pearclass($str) {
 	return \Phpf\Util\Str::pearClass($str);
@@ -442,20 +441,6 @@ function is_serialized($data, $strict = true) {
 ============================= */
 
 /**
- * Url-safe Base64 encode.
- */
-function base64_encode_urlsafe($str) {
-	return \Phpf\Util\Path::safeBase64Encode($str);
-}
-
-/**
- * Url-safe Base64 decode.
- */
-function base64_decode_urlsafe($str) {
-	return \Phpf\Util\Path::safeBase64Decode($str);
-}
-
-/**
  * Converts a path to URL
  */
 function path_url($path, $protocol = 'http') {
@@ -475,17 +460,17 @@ function rand_bytes($length = 12, $strong = true) {
 
 /**
  * Generate a UUID
- * 32 characters (a-f and 0-9) in format 8-4-4-12.
+ * 32 characters (a-f and 0-9) in format 8-4-4-4-12.
  */
 function generate_uuid() {
-	return \Phpf\Util\Security::generateUuid();
+	return hash_format(\Phpf\Util\Rand::hex(32));
 }
 
 /**
- * Generates a 32-byte base64-encoded random string.
+ * Generates a 32-byte base64-encoded random string safe for URLs.
  */
 function generate_csrf_token() {
-	return \Phpf\Util\Security::generateCsrfToken();
+	return base64encode(generate_uuid(), true);
 }
 
 /** ============================

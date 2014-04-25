@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * @package Phpf\Common
+ */
 namespace Phpf\Common;
 
 interface iManager {

@@ -44,10 +44,17 @@ class Response {
 	protected $body;
 	
 	/**
+	 * Whether to send a message body in the response.
+	 * False for HEAD requests as per RFC 3875
+	 * @var boolean
+	 */
+	protected $send_body;
+	
+	/**
 	 * Whether to gzip the response body.
 	 * @var boolean
 	 */
-	protected $gzip;
+	protected $gzip_body;
 	
 	/**
 	 * Associative array of permitted content types.
@@ -59,13 +66,29 @@ class Response {
 		'jsonp' => 'text/javascript',
 		'json'	=> 'application/json',
 	);
+	
+	/**
+	 * Whether the response has been sent.
+	 * 
+	 * Used for auto-send on shutdown and preventing multiple responses.
+	 * 
+	 * @var boolean
+	 */
+	protected static $sent = false;
 
 	/**
-	 * Constructor - sets gzip to false by default.
+	 * Sets gzip to false and registers the 'send()' method as a shutdown function.
+	 * 
+	 * The response will not sent be more than once - if send() is called before 
+	 * shutdown, or multiple times otherwise, it will only be sent the first time.
+	 * 
 	 * @return void
 	 */
 	public function __construct() {
-		$this->gzip = false;
+		$this->gzip_body = false;
+		
+		// automatically send response
+		register_shutdown_function(array($this, 'send'));
 	}
 	
 	/**
@@ -76,6 +99,9 @@ class Response {
 	 */
 	public function setRequest(Request $request) {
 		
+		// send body if not a HEAD request
+		$this->send_body = ! $request->is('HEAD');
+		
 		// first try to set content type using parameter (if set)
 		if (! isset($request->content_type) || ! $this->maybeSetContentType($request->content_type)) {
 			// now try using header (if set)
@@ -84,7 +110,7 @@ class Response {
 		
 		// shall we gzip?
 		if (http_in_request_header('accept-encoding', 'gzip') && extension_loaded('zlib')) {
-			$this->gzip = true;
+			$this->gzip_body = true;
 		}
 		
 		// For XHR/AJAX requests, don't cache response, nosniff, and deny iframes
@@ -103,9 +129,12 @@ class Response {
 	 */
 	public function send() {
 		
+		// don't send more than once
+		if (static::$sent) return;
+		
 		// (maybe) start output buffering
-		if (1 >= ob_get_level()) {
-			#if (! $this->gzip || ! ob_start('ob_gzhandler'))
+		if (2 > ob_get_level()) {
+			#if (! $this->gzip_body || ! ob_start('ob_gzhandler'))
 				ob_start();
 		}
 		
@@ -114,12 +143,12 @@ class Response {
 			$this->nocache();
 		}
 
-		// Status header
+		// send Status header
 		if (! isset($this->status)) {
 			if (isset($GLOBALS['HTTP_RESPONSE_CODE'])) {
 				$this->status = $GLOBALS['HTTP_RESPONSE_CODE'];
 			} else if (isset($this->headers['Location'])) {
-				$this->status = HTTP_REDIRECT_FOUND;
+				$this->status = 302;
 			} else {
 				$this->status = 200;
 			}
@@ -127,23 +156,26 @@ class Response {
 		
 		http_send_status($this->status);
 		
-		// Content-Type header
+		// send Content-Type header
 		if (! isset($this->content_type)) {
 			$this->content_type = static::DEFAULT_CONTENT_TYPE;
 		}
 
 		http_send_content_type($this->content_type, $this->getCharset());
 
-		// Rest of headers
+		// send other headers
 		foreach ( $this->headers as $name => $value ) {
 			header(sprintf("%s: %s", $name, $value), true);
 		}
 		
-		// Output the body
-		echo $this->body;
-
-		ob_end_flush();
-
+		// output the body
+		if ($this->send_body) {
+			echo $this->body;
+			ob_end_flush();
+		}
+		
+		static::$sent = true;
+		
 		exit;
 	}
 
@@ -160,8 +192,7 @@ class Response {
 			if (method_exists($value, '__toString')) {
 				$value = $value->__toString();
 			} else {
-				trigger_error('Cannot set var as body - given '.gettype($value), E_USER_NOTICE);
-				return $this;
+				throw new \InvalidArgumentException('Cannot set var as body - given '.gettype($value));
 			}
 		}
 

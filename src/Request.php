@@ -14,31 +14,31 @@ class Request {
 	protected $method;
 	
 	/**
-	 * Request URI
+	 * URI path, stripped of query.
 	 * @var string
 	 */
 	protected $uri;
 	
 	/**
-	 * Request query string
+	 * Query string
 	 * @var string
 	 */
 	protected $query;
 	
 	/**
-	 * Request HTTP headers
+	 * HTTP headers
 	 * @var array
 	 */
 	protected $headers;
 	
 	/**
-	 * Request Cookies
+	 * Cookies
 	 * @var array
 	 */
 	protected $cookies;
 	
 	/**
-	 * Request files
+	 * Files uploaded
 	 * @var array
 	 */
 	protected $files;
@@ -56,13 +56,13 @@ class Request {
 	protected $query_params;
 	
 	/**
-	 * Request body parameters.
+	 * Body parameters.
 	 * @var array
 	 */
 	protected $body_params;
 	
 	/**
-	 * Request path parameters.
+	 * Path parameters.
 	 * @var array
 	 */
 	protected $path_params;
@@ -80,36 +80,50 @@ class Request {
 	protected $content_type;
 	
 	/**
-	 * Whether to allow method override via "X-Http-Method-Override" header.
+	 * Whether to globalize parameters to $_REQUEST.
+	 * 
 	 * Default true.
-	 * @var boolean
-	 */
-	protected $allow_method_override_header = true;
-	
-	/**
-	 * Whether to allow method override via "_method" query parameter.
-	 * Default false.
-	 * @var boolean
-	 */
-	protected $allow_method_override_parameter = false;
-	
-	/**
-	 * Whether to globalize the request parameters to $_REQUEST.
+	 * 
 	 * @var boolean
 	 */
 	protected $globalize = true;
 	
 	/**
-	 * File extensions to strip from URLs.
-	 * If matched, will set Request $content_type property
-	 * and override any set by the header.
+	 * File extensions to strip from URLs, delimeted with "|".
+	 * 
+	 * If matched, sets $content_type property, and the Response
+	 * will use it instead of negotiating the 'Accept' header.
+	 * 
+	 * Defaults are html, jsonp, json, and xml.
+	 * 
+	 * @var string
 	 */
-	protected $strip_extensions = 'html|jsonp|json|xml|php';
+	protected $strip_extensions = 'html|jsonp|json|xml';
 	
 	/**
-	 * Indexed array of content types that will be respected.
-	 * If an invalid or no type is requested, the default is used.
-	 * @see Response
+	 * Whether to allow method override via "X-Http-Method-Override" 
+	 * header and "_method" query parameter.
+	 * 
+	 * Default for header is true.
+	 * Default for parameter is false.
+	 * 
+	 * @var array
+	 */
+	protected $allow_method_override = array(
+		'header' => true,
+		'parameter' => false,
+	);
+	
+	/**
+	 * Indexed array of content types that will be honored.
+	 * 
+	 * Clients can request the corresponding MIME types 
+	 * through the Accept header and/or file ext.
+	 * 
+	 * Defaults are html, json, jsonp, and xml.
+	 * 
+	 * @see \Phpf\Response
+	 * 
 	 * @var array
 	 */
 	protected $allow_content_types = array(
@@ -120,7 +134,12 @@ class Request {
 	);
 	
 	/**
-	 * Build the request using global variables.
+	 * Build the request using the (super) global variables.
+	 * 
+	 * @uses http_get_request_headers()
+	 * @uses http_get_request_body()
+	 * 
+	 * @return \Phpf\Request
 	 */
 	public static function createFromGlobals() {
 		
@@ -140,29 +159,39 @@ class Request {
 		
 		$headers = http_get_request_headers();
 		
-		// Use php://input except when POST w/ enctype="multipart/form-data"
-		// @see {@link http://us3.php.net/manual/en/wrappers.php.php}
-		if ('POST' === $method && isset($headers['content-type']) 
-			&& 'multipart/form-data' === $headers['content-type'])
-		{
-			$postdata = $_POST;
+		// Set request body data as per RFC 3875 4.2, 4.3
+		if ('HEAD' === $method || ('POST' === $method && empty($headers['content-length']))) {
+			// HEAD requests have no body - ha!
+			// POST requests must have content-length
+			$data = array();
+		} else if ('POST' === $method && isset($headers['content-type']) && 'multipart/form-data' === $headers['content-type']) {
+			// Use php://input except for POST with enctype="multipart/form-data"
+			// @see {@link http://us3.php.net/manual/en/wrappers.php.php}
+			$data = $_POST;
 		} else {
-			parse_str(http_get_request_body(), $postdata);
+			parse_str(http_get_request_body(), $data);
 		}
 		
-		$request = new static();
-		
-		return $request->create($method, $uri, $query, $headers, $postdata, $_COOKIE, $_FILES);
+		return new static($method, $uri, $query, $headers, $data, $_COOKIE, $_FILES);
 	}
 	
 	/**
 	 * Build request from $server array
+	 * 
+	 * @param string $method HTTP method.
+	 * @param string $uri Clean request path, with no beginning/ending slashes or query string.
+	 * @param string $query Query string.
+	 * @param array $headers Associative array of HTTP headers.
+	 * @param array $body [Optional] Array of data (body).
+	 * @param array $cookies [Optional] Associative array of cookies.
+	 * @param array $files [Optional] Array of file uploads.
 	 */
-	public function create($method, $uri, $query, array $headers, array $postdata = null, array $cookies = null, array $files = null){
+	public function __construct($method, $uri, $query, array $headers, array $body = null, array $cookies = null, array $files = null){
 		
 		// Clean and set request path
 		$uri = trim(filter_var($uri, FILTER_SANITIZE_STRING), '/');
 		
+		// match file extensions to set content-type
 		if (preg_match("/[\.|\/]($this->strip_extensions)/", $uri, $matches)) {
 			$this->content_type = $matches[1];
 			// remove extension and separator
@@ -180,13 +209,13 @@ class Request {
 		
 		// Set query string and params
 		if (! empty($query)) {
-			$this->query = html_entity_decode($query);
+			$this->query = html_entity_decode(urldecode($query));
 			parse_str($this->query, $this->query_params);
 		}
 		
 		// Set post data
-		if (isset($postdata)) {
-			$this->body_params = $postdata;
+		if (isset($body)) {
+			$this->body_params = $body;
 			$this->params = array_merge($this->query_params, $this->body_params);
 		} else {
 			$this->params = $this->query_params;
@@ -195,22 +224,27 @@ class Request {
 		// Override request method if POST
 		if ('POST' === $method) {
 			// via header
-			if ($this->allow_method_override_header && isset($this->headers['x-http-method-override'])) {
+			if ($this->isMethodOverrideAllowed('header') && isset($this->headers['x-http-method-override'])) {
 				$method = $this->headers['x-http-method-override']; 
 			}
 			//via parameter
-			if ($this->allow_method_override_parameter && isset($this->query_params['_method'])) {
-				$method = $this->query_params['_method'];
+			if ($this->isMethodOverrideAllowed('parameter') && isset($this->query_params['_method'])) {
+				$method = strtoupper($this->query_params['_method']);
 			}
 		}
 		
-		$this->method = strtoupper($method);
+		$this->method = $method;
+		
+		$this->globalize();
 		
 		return $this;
 	}
 	
 	/**
-	 * Magic __get()
+	 * Returns a property or parameter value.
+	 * 
+	 * @param string $var Property or parameter name to retrieve.
+	 * @return mixed Value of property or parameter, if set, otherwise null.
 	 */
 	public function __get($var) {
 			
@@ -223,53 +257,6 @@ class Request {
 		}
 		
 		return null;
-	}
-	
-	/**
-	 * Sets matched route path parameters.
-	 * 
-	 * @param array $params Associative array of matched path parameters.
-	 * @return $this
-	 */
-	public function setPathParams(array $params){
-		
-		$this->path_params = $params;
-		$this->params = array_merge($this->params, $this->path_params);
-		
-		if ($this->globalize) {
-			$_REQUEST = $this->params;
-		}
-		
-		return $this;
-	}
-	
-	/**
-	 * Sets the session
-	 * 
-	 * @param Phpf\Session $session
-	 * @return $this
-	 */
-	public function setSession(Session $session) {
-		$this->session = $session;
-		return $this;
-	}
-	
-	/**
-	 * Returns session object
-	 * 
-	 * @param return SessionInterface
-	 */
-	public function getSession() {
-		return isset($this->session) ? $this->session : null;
-	}
-	
-	/**
-	 * Returns true if session is set, otherwise false.
-	 * 
-	 * @return boolean
-	 */
-	public function sessionExists() {
-		return isset($this->session);
 	}
 	
 	/**
@@ -297,42 +284,6 @@ class Request {
 	 */
 	public function getQuery() {
 		return $this->query;	
-	}
-	
-	/**
-	 * Returns all parameter values.
-	 * 
-	 * @return array Query, path, and body parameters.
-	 */
-	public function getParams() {
-		return $this->params;
-	}
-	
-	/**
-	 * Returns true if a parameter is set.
-	 * 
-	 * @param string $name Parameter name
-	 * @return boolean True if set, otherwise false.
-	 */
-	public function paramExists($name) {
-		return isset($this->params[$name]);
-	}
-	
-	/**
-	 * Returns a parameter value
-	 * 
-	 * @param string $name Parameter name
-	 * @return mixed Parameter value.
-	 */
-	public function getParam($name) {
-		return isset($this->params[$name]) ? $this->params[$name] : null;
-	}
-	
-	/**
-	 * &Alias of getParam()
-	 */
-	public function param($name) {
-		return $this->getParam($name);	
 	}
 	
 	/**
@@ -373,22 +324,90 @@ class Request {
 	}
 	
 	/**
-	 * Returns true if given content-type is valid for response.
+	 * Sets matched route path parameters.
 	 * 
-	 * @param string $type Content type.
-	 * @return boolean True if allowed, otherwise false.
+	 * @param array $params Associative array of matched path parameters.
+	 * @return $this
 	 */
-	public function isContentTypeAllowed($type) {
-		return isset($this->allow_content_types[$type]);
+	public function setPathParams(array $params){
+		$this->path_params = $params;
+		$this->params = array_merge($this->params, $this->path_params);
+		$this->globalize();
+		return $this;
 	}
 	
 	/**
-	 * Returns array of allowed content types.
+	 * Returns all parameter values.
 	 * 
-	 * @return array Indexed array of allowed content types.
+	 * @return array Query, path, and body parameters.
 	 */
-	public function getAllowedContentTypes() {
-		return array_keys($this->allow_content_types);
+	public function getParams() {
+		return $this->params;
+	}
+	
+	/**
+	 * Returns a parameter value
+	 * 
+	 * @param string $name Parameter name
+	 * @return mixed Parameter value.
+	 */
+	public function getParam($name) {
+		return isset($this->params[$name]) ? $this->params[$name] : null;
+	}
+	
+	/**
+	 * &Alias of getParam()
+	 */
+	public function param($name) {
+		return $this->getParam($name);	
+	}
+	
+	/**
+	 * Returns true if a parameter is set.
+	 * 
+	 * @param string $name Parameter name
+	 * @return boolean True if set, otherwise false.
+	 */
+	public function paramExists($name) {
+		return isset($this->params[$name]);
+	}
+	
+	/**
+	 * Sets the session object.
+	 * 
+	 * @param Phpf\Session $session
+	 * @return $this
+	 */
+	public function setSession(Session $session) {
+		$this->session = $session;
+		return $this;
+	}
+	
+	/**
+	 * Returns session object.
+	 * 
+	 * @param return SessionInterface
+	 */
+	public function getSession() {
+		return isset($this->session) ? $this->session : null;
+	}
+	
+	/**
+	 * Returns true if session is set, otherwise false.
+	 * 
+	 * @return boolean
+	 */
+	public function sessionExists() {
+		return isset($this->session);
+	}
+	
+	/**
+	 * Returns content type, if set.
+	 * 
+	 * @return string Content-type if set, otherwise null.
+	 */
+	public function getContentType() {
+		return isset($this->content_type) ? $this->content_type : null;
 	}
 	
 	/**
@@ -408,10 +427,47 @@ class Request {
 	}
 	
 	/**
-	 * Returns content type, if set.
+	 * Returns true if given content-type is valid for response.
+	 * 
+	 * @param string $type Content type.
+	 * @return boolean True if allowed, otherwise false.
 	 */
-	public function getContentType() {
-		return isset($this->content_type) ? $this->content_type : null;
+	public function isContentTypeAllowed($type) {
+		return isset($this->allow_content_types[$type]);
+	}
+	
+	/**
+	 * Returns array of allowed content types.
+	 * 
+	 * @return array Indexed array of allowed content types.
+	 */
+	public function getAllowedContentTypes() {
+		return array_keys($this->allow_content_types);
+	}
+	
+	/**
+	 * Sets whether to globalize the request params to $_REQUEST.
+	 * 
+	 * @param boolean $value True or false
+	 * @return $this
+	 */
+	public function setGlobalize($value) {
+		$this->globalize = (bool)$value;
+		return $this;
+	}
+	
+	/**
+	 * Adds an extension to strip from URIs
+	 * 
+	 * @param string $extension Extension to strip from URIs.
+	 * @return $this
+	 */
+	public function stripExtension($extension) {
+		$extension = ltrim(strtolower($extension), '.');
+		if (false === strpos($this->strip_extensions, $extension)) {
+			$this->strip_extensions .= '|'.$extension;
+		}
+		return $this;
 	}
 	
 	/**
@@ -420,30 +476,29 @@ class Request {
 	 * @return boolean True if XMLHttpRequest, otherwise false.
 	 */
 	public function isXhr() {
-		return isset($this->headers['x-requested-with'])
-			&& 'XMLHttpRequest' === $this->headers['x-requested-with'];
+		return isset($this->headers['x-requested-with']) && 'XMLHttpRequest' === $this->headers['x-requested-with'];
 	}
 	
 	/**
 	 * Boolean method/xhr checker.
 	 * 
-	 * @param string $thing Method name or 'XHR' or 'AJAX'.
-	 * @return boolean True if request is given thing, otherwise false.
+	 * @param string $thing HTTP method name, or 'xhr' or 'ajax'.
+	 * @return boolean True if request is given thing, or null if unknown thing.
 	 */
 	public function is($thing) {
 		switch(strtoupper($thing)) {
-			case HTTP_METH_GET :
-				return HTTP_METH_GET === $this->method;
-			case HTTP_METH_POST :
-				return HTTP_METH_POST === $this->method;
-			case HTTP_METH_PUT :
-				return HTTP_METH_PUT === $this->method;
-			case HTTP_METH_HEAD :
-				return HTTP_METH_HEAD === $this->method;
-			case HTTP_METH_DELETE :
-				return HTTP_METH_DELETE === $this->method;
-			case HTTP_METH_OPTIONS :
-				return HTTP_METH_OPTIONS === $this->method;
+			case 'GET' :
+				return 'GET' === $this->method;
+			case 'POST' :
+				return 'POST' === $this->method;
+			case 'PUT' :
+				return 'PUT' === $this->method;
+			case 'HEAD' :
+				return 'HEAD' === $this->method;
+			case 'DELETE' :
+				return 'DELETE' === $this->method;
+			case 'OPTIONS' :
+				return 'OPTIONS' === $this->method;
 			case 'PATCH' :
 				return 'PATCH' === $this->method;
 			case 'XHR' :
@@ -456,72 +511,65 @@ class Request {
 	
 	/** Am I a GET request? */
 	public function isGet() {
-		return $this->is(HTTP_METH_GET);
+		return $this->is('GET');
 	}
 	
 	/** Am I a POST request? */
 	public function isPost() {
-		return $this->is(HTTP_METH_POST);
+		return $this->is('POST');
 	}
 	
 	/**  Am I a PUT request? */
 	public function isPut() {
-		return $this->is(HTTP_METH_PUT);
+		return $this->is('PUT');
 	}
 	
 	/** Am I a HEAD request? */
 	public function isHead() {
-		return $this->is(HTTP_METH_HEAD);
+		return $this->is('HEAD');
 	}
 	
 	/**
-	 * Allow HTTP method override via header.
+	 * Allow HTTP method override via header or parameter.
 	 * 
+	 * @param string $where One of 'header' or 'parameter'.
 	 * @return $this
 	 */
-	public function allowMethodOverrideHeader() {
-		$this->allow_method_override_header = true;
+	public function allowMethodOverride($where) {
+		$this->allow_method_override[$where] = true;
 		return $this;
 	}
 	
 	/**
-	 * Disallow HTTP method override via header.
+	 * Disallow HTTP method override via header or parameter.
 	 * 
+	 * @param string $where One of 'header' or 'parameter'.
 	 * @return $this
 	 */
-	public function disallowMethodOverrideHeader() {
-		$this->allow_method_override_header = false;
+	public function disallowMethodOverride($where) {
+		$this->allow_method_override[$where] = false;
 		return $this;
 	}
 	
 	/**
-	 * Allow HTTP method override via query param.
+	 * Whether to allow HTTP method override via header or parameter.
 	 * 
-	 * @return $this
+	 * @param string $where One of 'header' or 'parameter'.
+	 * @return boolean True if method override is permitted for given location, otherwise false.
 	 */
-	public function allowMethodOverrideParameter() {
-		$this->allow_method_override_parameter = true;
-		return $this;
+	public function isMethodOverrideAllowed($where) {
+		return $this->allow_method_override[$where];
 	}
 	
 	/**
-	 * Disallow HTTP method override via query param.
+	 * Globalizes the request parameters, if set to do so.
 	 * 
 	 * @return $this
 	 */
-	public function disallowMethodOverrideParameter() {
-		$this->allow_method_override_parameter = false;
-		return $this;
-	}
-	
-	/**
-	 * Sets whether to globalize the request params to $_REQUEST.
-	 * 
-	 * @param boolean $value True or false
-	 * @return $this
-	 */
-	public function setGlobalize($value) {
-		$this->globalize = (bool)$value;
+	protected function globalize() {
+		if ($this->globalize) {
+			$_REQUEST = $this->params;
+		}
 		return $this;
 	}
 	

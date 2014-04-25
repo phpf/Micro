@@ -47,9 +47,9 @@ class ViewManager extends DataContainer implements iEventable, iManager, SplObse
 	/**
 	 * Construct manager with Filesystem
 	 */
-	public function __construct(Filesystem &$filesystem) {
+	public function __construct(Filesystem $filesystem) {
 
-		$this->filesystem = &$filesystem;
+		$this->filesystem = $filesystem;
 		
 		$this->addParser(new PhpParser);
 	}
@@ -94,7 +94,7 @@ class ViewManager extends DataContainer implements iEventable, iManager, SplObse
 	}
 	
 	/**
-	 * Sets the events container as a property.
+	 * Sets the events container.
 	 */
 	public function setEvents(EventContainer $container) {
 		$this->events = $container;
@@ -138,9 +138,7 @@ class ViewManager extends DataContainer implements iEventable, iManager, SplObse
 	 * Returns the last returned view, if any.
 	 */
 	public function getCurrentView() {
-		return empty($this->views)
-			? null
-			: reset($this->views);
+		return empty($this->views) ? null : reset($this->views);
 	}
 
 	/**

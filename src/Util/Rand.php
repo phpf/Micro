@@ -4,55 +4,171 @@ namespace Phpf\Util;
 
 class Rand {
 	
+	/**
+	 * Alphabetic charlist ID.
+	 * @var int
+	 */
 	const ALPHA = 1;
+	
+	/**
+	 * Numeric charlist ID.
+	 * @var int
+	 */
 	const NUM = 2;
+	
+	/**
+	 * Punctuation charlist ID.
+	 * @var int
+	 */
 	const PUNCT = 4;
+	
+	/**
+	 * Whitespace charlist ID.
+	 * @var int
+	 */
 	const WHITESPACE = 8;
+	
+	/**
+	 * Alphanumeric charlist ID.
+	 * @var int
+	 */
 	const ALNUM = 13305;
+	
+	/**
+	 * Salt charlist ID.
+	 * @var int
+	 */
 	const SALT = 13307;
+	
+	/**
+	 * Hex charlist ID.
+	 * @var int
+	 */
 	const HEX = 13309;
+	
+	/**
+	 * Non-zero charlist ID.
+	 * @var int
+	 */
 	const NONZERO = 13311;
+	
+	/**
+	 * "Distinct" charlist ID.
+	 * @var int
+	 */
 	const DISTINCT = 13313;
 	
+	/**
+	 * List of alphabetic characters.
+	 * @var string
+	 */
 	const CHARS_ALPHA = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	
+	/**
+	 * List of numeric characters.
+	 * @var string
+	 */
 	const CHARS_NUM = '0123456789';
+	
+	/**
+	 * List of punctuation characters.
+	 * @var string
+	 */
 	const CHARS_PUNCT = '~!@#$%^&*()_+=-{}[]\'";:><,./?';
+	
+	/**
+	 * List of whitespace characters.
+	 * @var string
+	 */
 	const CHARS_WHITESPACE = ' ';
+	
+	/**
+	 * List of hex characters.
+	 * @var string
+	 */
 	const CHARS_HEX = '0123456789abcdef';
+	
+	/**
+	 * List of nonzero characters.
+	 * @var string
+	 */
 	const CHARS_NONZERO = '123456789';
+	
+	/**
+	 * List of "distinct" characters.
+	 * @var string
+	 */
 	const CHARS_DISTINCT = '2345679ACDEFHJKLMNPRSTUVWXYZ';
 	
 	/**
 	* Generate a random string from one of several of character pools.
 	*
-	* @param int $length Length of the returned random string (default 16)
-	* @param string $type The type of characters to use to generate string.
+	* @param int $length Length of the returned random string (default 12)
+	* @param string $type The type of characters to use to generate string (default alphanumeric).
 	* @return string A random string
 	*/
 	public static function str($length = 12, $type = self::ALNUM) {
 		return static::fromCharlist($length, static::getChars($type));
 	}
-
+	
+	/**
+	 * Generate a random string of the given length using alphabetic characters.
+	 * 
+	 * @param int $length Length of string to generate.
+	 * @return string Random string of given length consisting of only letters.
+	 */
 	public static function alpha($length) {
 		return static::fromCharlist($length, static::CHARS_ALPHA);
 	}
 
+	/**
+	 * Generate a random string of the given length using numeric characters.
+	 * 
+	 * @param int $length Length of string to generate.
+	 * @return string Random string of given length consisting of only numbers.
+	 */
 	public static function num($length) {
 		return static::fromCharlist($length, static::CHARS_NUM);
 	}
 	
+	/**
+	 * Generate a random string of the given length using hexadecimal characters.
+	 * 
+	 * @param int $length Length of string to generate.
+	 * @return string Random string of given length consisting of only hex chars.
+	 */
 	public static function hex($length) {
 		return static::fromCharlist($length, static::CHARS_HEX);
 	}
 	
+	/**
+	 * Generate a random string of the given length using punctuation characters.
+	 * 
+	 * @param int $length Length of string to generate.
+	 * @return string Random string of given length consisting of only punctuation.
+	 */
 	public static function punct($length) {
 		return static::fromCharlist($length, static::CHARS_PUNCT);
 	}
 	
+	/**
+	 * Generate a random string of the given length using alpha, numeric, punctuation
+	 * and whitespace characters.
+	 * 
+	 * @param int $length	Length of string to generate.
+	 * @return string		Random string of given length consisting of letters, numbers,
+	 * 						punctuation, and whitespace.
+	 */
 	public static function salt($length) {
 		return static::fromCharlist($length, static::getChars(static::SALT));
 	}
 	
+	/**
+	 * Generate a random string of the given length using alphanumeric characters.
+	 * 
+	 * @param int $length Length of string to generate.
+	 * @return string Random string of given length consisting of letters and numbers.
+	 */
 	public static function alnum($length) {
 		return static::fromCharlist($length, static::getChars(static::ALNUM));
 	}
@@ -80,6 +196,9 @@ class Rand {
 	/**
 	 * Gets a string of characters from a character list ID or name.
 	 * 
+	 * You can use this function obtain customized character lists by
+	 * using the charlist ID's in bitwise fashion like "Rand::ALPHA|Rand::PUNCT".
+	 * 
 	 * @param int|string $val Character list ID or name
 	 * @return string Characters associated with the ID, or null if a custom unknown ID is given.
 	 */
@@ -87,8 +206,8 @@ class Rand {
 			
 		if (! is_numeric($val)) {
 			if (null === $id = static::charsId($val)) {
-				trigger_error("Unknown character list '$val'.", E_USER_WARNING);
-				$id = static::ALNUM; // don't fail completely...
+				trigger_error("Unknown character list ID '$val'.", E_USER_WARNING);
+				return null;
 			}
 		} else {
 			$id = (int)$val;
@@ -100,10 +219,7 @@ class Rand {
 				case 13305: // alnum
 					return static::CHARS_ALPHA.static::CHARS_NUM;
 				case 13307: // salt
-					return static::CHARS_ALPHA
-						.static::CHARS_NUM
-						.static::CHARS_WHITESPACE
-						.static::CHARS_PUNCT;
+					return static::CHARS_ALPHA.static::CHARS_NUM.static::CHARS_WHITESPACE.static::CHARS_PUNCT;
 				case 13309: // hex
 					return static::CHARS_HEX;
 				case 13311: // nonzero
@@ -111,23 +227,23 @@ class Rand {
 				case 13313: // distinct
 					return static::CHARS_DISTINCT;
 				default: // no idea
-					trigger_error("Unknown unique character list ID '$val'.");
+					trigger_error("Unknown character list ID '$val'.", E_USER_WARNING);
 					return null;
 			}
 		}
 		
 		$chars = '';
 		
-		if (static::ALPHA & $val) {
+		if (static::ALPHA & $id) {
 			$chars .= static::ALPHA;
 		}
-		if (static::NUM & $val) {
+		if (static::NUM & $id) {
 			$chars .= static::NUM;
 		}
-		if (static::PUNCT & $val) {
+		if (static::PUNCT & $id) {
 			$chars .= static::CHARS_PUNCT;
 		}
-		if (static::WHITESPACE & $val) {
+		if (static::WHITESPACE & $id) {
 			$chars .= static::CHARS_WHITESPACE;
 		}
 		
@@ -139,33 +255,28 @@ class Rand {
 	 * Kind of like filter_id()
 	 */
 	public static function charsId($name) {
-		switch ($name) {
+		switch (strtolower($name)) {
 			case 'alnum':
-				return static::CHARS_ALPHA.static::CHARS_NUM;
+				return static::ALNUM;
 			case 'salt':
-				return static::CHARS_ALPHA
-					.static::CHARS_NUM
-					.static::CHARS_WHITESPACE
-					.static::CHARS_PUNCT;
+				return static::SALT;
 			case 'numeric':
 			case 'num':
-				return static::CHARS_NUM;
+				return static::NUM;
 			case 'alpha':
-				return static::CHARS_ALPHA;
+				return static::ALPHA;
 			case 'hex':
 			case 'hexdec':
-				return static::CHARS_HEX;
+				return static::HEX;
 			case 'nonzero':
-				return static::CHARS_NONZERO;
+				return static::NONZERO;
 			case 'distinct':
-				return static::CHARS_DISTINCT;
+				return static::DISTINCT;
 			case 'punct':
 			case 'punc':
-				return static::CHARS_PUNCT;
+				return static::PUNCT;
 			case 'complex': // all but whitespace
-				return static::CHARS_ALPHA
-					.static::CHARS_NUM
-					.static::CHARS_PUNCT;
+				return static::ALPHA | static::NUM | static::PUNCT;
 			default:
 				return null;
 		}
@@ -224,9 +335,10 @@ class Rand {
 	}
 
 	/**
-	 * @Package RandomLib
-	 * @Author George Argyros <argyros.george@gmail.com>
-	 * @Copyright (c) 2012, George Argyros. All rights reserved.
+	 * @package RandomLib
+	 * @author George Argyros <argyros.george@gmail.com>
+	 * @copyright 2012 George Argyros. All rights reserved.
+	 * @license 
 	 * Redistribution and use in source and binary forms, with or without
 	 * modification, are permitted provided that the following conditions are met:
 	 * * Redistributions of source code must retain the above copyright
@@ -234,7 +346,7 @@ class Rand {
 	 * * Redistributions in binary form must reproduce the above copyright
 	 * notice, this list of conditions and the following disclaimer in the
 	 * documentation and/or other materials provided with the distribution.
-	 * * Neither the name of the <organization> nor the
+	 * * Neither the name of the organization nor the
 	 * names of its contributors may be used to endorse or promote products
 	 * derived from this software without specific prior written permission.
 	 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND

@@ -6,11 +6,23 @@ use Phpf\App;
 
 class Loader
 {
-
+	
+	/**
+	 * Application instance.
+	 * @var \Phpf\App
+	 */
 	protected $app;
 
+	/**
+	 * Package loader configuration settings.
+	 * @var array
+	 */
 	protected $config;
-
+	
+	/**
+	 * Package loader configuration defaults.
+	 * @var array
+	 */
 	protected $default_config = array(
 		'dirs' => array(
 			'views' => 'views',
@@ -20,63 +32,63 @@ class Loader
 			'config/tables.php', 
 		), 
 	);
-
+	
+	/**
+	 * Constructs the loader by setting application as property (by reference)
+	 * and configuring the package loading settings from the "packages-config"
+	 * item of the app config.
+	 * 
+	 * @param \Phpf\App &$app Application instance.
+	 * @return void
+	 */
 	public function __construct(App &$app) {
-
 		$this->app = &$app;
-
 		$this->configure($app->get('config')->get('packages-config'));
 	}
 
 	/**
-	 * Loads the package.
+	 * Loads a package object.
+	 * 
+	 * @param PackageInterface $package Package object to load.
+	 * @return $this
 	 */
 	public function load(PackageInterface $package) {
 
-		$app = $this->app;
-
-		$pPath = rtrim($package->getPath(), '/\\').'/';
-		$pName = basename($package->getPath());
-
-		$pkgFile = $pPath.$pName.'.php';
-
-		// Search in base directory for a file with the same name
-		if (file_exists($pkgFile)) {
-
-			$include = function($__file__) use($app) {
-				require $__file__;
-			};
-
-			$include($pkgFile);
-		}
-
-		$includeWithObject = function($_file) use ($pPath, $app) {
-			$_file = ltrim($_file, '/\\');
-			if (file_exists($pPath.$_file)) {
-				require $pPath.$_file;
-			}
-		};
-
-		$addFilesystemPaths = function($_dir, $_group) use ($pPath, $app) {
-			$_dir = trim($_dir, '/\\');
-			if (is_dir($pPath.$_dir)) {
-				$this->app->get('filesystem')->add($pPath.$_dir.'/', $_group);
-			}
-		};
-
+		$path = rtrim($package->getPath(), '/\\') . '/';
+		
+		// Include a file in base directory with same name as package, if it exists
+		\Phpf\App::includeInScope($path.basename($path).'.php', true);
+		
+		// Include a 'bootstrap.php' file if exists
+		\Phpf\App::includeInScope($path.'bootstrap.php', true);
+		
+		// Include config files provided by package
 		foreach ( $this->config['files'] as $file ) {
-			$includeWithObject($file);
+			\Phpf\App::includeInScope($path.ltrim($file, '/\\'), true);
 		}
-
+		
+		// Add directories provided by package
 		foreach ( $this->config['dirs'] as $group => $dir ) {
-			$addFilesystemPaths($dir, $group);
+			$dir = trim($dir, '/\\');
+			if (is_dir($path.$dir)) {
+				$this->app->get('filesystem')->add($path.$dir.'/', $group);
+			}
 		}
-
+		
+		// Set the package to loaded
 		$package->setLoaded(true);
 
-		return true;
+		return $this;
 	}
-
+	
+	/**
+	 * Merges package loading configuration settings from app with defaults.
+	 * 
+	 * Array is set as '$config' property.
+	 * 
+	 * @param array|ArrayAccess $config Configuration object/array ('packages-config' item).
+	 * @return void
+	 */
 	protected function configure($config) {
 
 		if (isset($config['dirs'])) {

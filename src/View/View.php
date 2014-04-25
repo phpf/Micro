@@ -29,7 +29,7 @@ class View extends Part implements SplSubject
 	 */
 	public function render() {
 		
-		$this->notify();
+		$this->notify(); // tell the manager we're rendering
 		
 		if ($this->object_context && 'php' === $this->parser->getType()) {
 			extract($this->data);

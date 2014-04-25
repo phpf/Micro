@@ -1,7 +1,12 @@
 <?php
-
+/**
+ * @package Phpf\Common
+ */
 namespace Phpf\Common;
 
+/**
+ * Static object registry.
+ */
 class StaticRegistry
 {
 

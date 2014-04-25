@@ -14,7 +14,7 @@ class Native implements SessionDriverInterface, \Countable {
 		$this->cookie_params = array_replace(array(
 			'lifetime' => 86400*7,
 			'path' => '/',
-			'domain' => '.'.HTTP_HOST,
+			'domain' => '.'.http_env('host'),
 			'secure' => false,
 			'httponly' => false,
 		), $cookieparams);

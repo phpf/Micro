@@ -27,6 +27,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Constructor
+	 * 
+	 * @param \Phpf\App $app Application instance.
+	 * @return void
 	 */
 	public function __construct(App $app) {
 
@@ -36,7 +39,16 @@ class PackageManager implements Common\iManager
 
 		$this->config = $app->get('config')->get('packages');
 	}
-
+	
+	/**
+	 * Parses and loads (some) packages specified in config.
+	 * 
+	 * 'functions' are loaded first;
+	 * 'preload' packages are loaded next; 
+	 * 'conditional' packages are then loaded, depending on criteria.
+	 * 
+	 * @return $this
+	 */
 	public function init() {
 
 		if (! empty($this->config['functions'])) {
@@ -65,12 +77,25 @@ class PackageManager implements Common\iManager
 
 		return $this;
 	}
-
+	
+	/**
+	 * Ssets the classname to use for packages of a given type.
+	 * 
+	 * @param string $package_type Type of package.
+	 * @param string $class Class to use for packages of given type.
+	 * @return $this
+	 */
 	public function setClass($package_type, $class) {
 		$this->classes[$package_type] = $class;
 		return $this;
 	}
 
+	/**
+	 * Returns the classname for packages of given type.
+	 * 
+	 * @param string $package_type Type of package.
+	 * @return string Classname for given package type if set, otherwise user-level warning triggered.
+	 */
 	public function getClass($package_type) {
 
 		if (isset($this->classes[$package_type])) {
@@ -85,12 +110,25 @@ class PackageManager implements Common\iManager
 
 		trigger_error("No class set for package type $package_type.");
 	}
-
+	
+	/**
+	 * Sets a directory path for packages of given type.
+	 * 
+	 * @param string $package_type Type of package.
+	 * @param string $path Directory path in which to find packages of this type.
+	 * @return $this
+	 */
 	public function setPath($package_type, $path) {
 		$this->paths[$package_type] = rtrim($path, '/\\').'/';
 		return $this;
 	}
-
+	
+	/**
+	 * Returns directory path to packages of given type.
+	 * 
+	 * @param string $package_type Type of package.
+	 * @return string Filesystem path if set, otherwise a user-level warning is triggered.
+	 */
 	public function getPath($package_type) {
 
 		if (isset($this->paths[$package_type]))
@@ -110,6 +148,8 @@ class PackageManager implements Common\iManager
 	/**
 	 * Implement iManager
 	 * Manages 'packages'
+	 * 
+	 * @return string 'packages'
 	 */
 	final public function manages() {
 		return 'packages';
@@ -117,6 +157,10 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Returns a package given its UID, or type and ID.
+	 * 
+	 * @param string $pkg Package UID, or Type if ID given as 2nd param.
+	 * @param string|null Package ID if Type given as first parameter, otherwise null.
+	 * @return PackageInterface Package if exists, otherwise null.
 	 */
 	public function get($uid /* | $type, $id */ ) {
 
@@ -127,6 +171,10 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Returns boolean, whether a package exists given its UID, or type and ID.
+	 * 
+	 * @param string $pkg Package UID, or Type if ID given as 2nd param.
+	 * @param string|null Package ID if Type given as first parameter, otherwise null.
+	 * @return boolean True if given package exists, otherwise false.
 	 */
 	public function exists($uid /* | $type, $id */ ) {
 
@@ -138,6 +186,10 @@ class PackageManager implements Common\iManager
 	/**
 	 * Unsets a package given its UID, or type and ID.
 	 * Note: This will not "disable" the package if it has been loaded.
+	 * 
+	 * @param string $pkg Package UID, or Type if ID given as 2nd param.
+	 * @param string|null Package ID if Type given as first parameter, otherwise null.
+	 * @return void
 	 */
 	public function remove($uid /* | $type, $id */ ) {
 
@@ -148,6 +200,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Adds a package object.
+	 * 
+	 * @param PackageInterface $package Package object.
+	 * @return $this
 	 */
 	public function add(PackageInterface $package) {
 		$this->packages[$package->getType()][$package->getId()] = $package;
@@ -156,6 +211,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Adds a module by name.
+	 * 
+	 * @param string $mod Module name
+	 * @return $this
 	 */
 	public function addModuleByName($mod) {
 		$modClass = $this->getClass('module');
@@ -164,6 +222,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Adds a library by name.
+	 * 
+	 * @param string $lib Library name
+	 * @return $this
 	 */
 	public function addLibraryByName($lib) {
 		$libClass = $this->getClass('library');
@@ -171,7 +232,11 @@ class PackageManager implements Common\iManager
 	}
 
 	/**
-	 * Adds an array of packages by UID. Optionally loads them.
+	 * Adds multiple packages by UID and optionally loads them.
+	 * 
+	 * @param array $packages Indexed array of package UID's.
+	 * @param boolean $load [Optional] Whether to load the given packages. Default: false.
+	 * @return void
 	 */
 	public function addPackages(array $packages, $load = false) {
 
@@ -182,7 +247,7 @@ class PackageManager implements Common\iManager
 				if ($load) {
 					$this->load('library.'.$lib);
 				}
-			} elseif (0 === strpos($package, 'module.')) {
+			} else if (0 === strpos($package, 'module.')) {
 				$mod = substr($package, 7);
 				$this->addModuleByName($mod);
 				if ($load) {
@@ -193,15 +258,19 @@ class PackageManager implements Common\iManager
 	}
 
 	/**
-	 * Loads a package given its UID, or type and ID.
+	 * Loads a package given an Object, UID, or Type and ID.
+	 * 
+	 * @param string|PackageInterface $pkg Package object, UID, or Type if ID given as 2nd param.
+	 * @param string|null Package ID if Type given as first parameter, otherwise null.
+	 * @return $this
 	 */
-	public function load($uid /* | $type, $id */ ) {
+	public function load($pkg /* | $type, $id */ ) {
 
 		$args = func_get_args();
 
 		if ($args[0] instanceof PackageInterface) {
 			$package = &$args[0];
-		} elseif (isset($args[1])) {
+		} else if (isset($args[1])) {
 			$package = $this->get($args[0], $args[1]);
 		} else {
 			$package = $this->get($args[0]);
@@ -228,6 +297,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Returns boolean, whether a package is loaded given its UID.
+	 * 
+	 * @param string $uid Package UID.
+	 * @return boolean True if package is known and loaded, otherwise false.
 	 */
 	public function isLoaded($uid) {
 
@@ -241,7 +313,10 @@ class PackageManager implements Common\iManager
 	}
 
 	/**
-	 * Sets up functions control for namespace
+	 * Sets up functions control for namespace.
+	 * 
+	 * @param string $namespace Package namespace
+	 * @return $this
 	 */
 	public function initFunctions($namespace) {
 		$this->functional[$namespace] = new PackageFunctions($namespace);
@@ -257,7 +332,7 @@ class PackageManager implements Common\iManager
 	public function loadFunctions($namespace, $package) {
 
 		if (! isset($this->functional[$namespace])) {
-			throw new \RuntimeException("Functions object for namespace $namespace is not set.");
+			$this->initFunctions($namespace);
 		}
 
 		return $this->functional[$namespace]->load($package);
@@ -273,7 +348,7 @@ class PackageManager implements Common\iManager
 	public function functionsLoaded($namespace, $package) {
 
 		if (! isset($this->functional[$namespace])) {
-			throw new \RuntimeException("Functions object for namespace $namespace is not set.");
+			return false;
 		}
 
 		return $this->functional[$namespace]->loaded($package);
@@ -281,6 +356,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Loads all packages of given type.
+	 * 
+	 * @param string Package Type to load.
+	 * @return $this
 	 */
 	public function loadAllOfType($type) {
 
@@ -297,6 +375,9 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Returns all package objects of given type.
+	 * 
+	 * @param string Package Type.
+	 * @return array Packages of given type, or empty array if none exist.
 	 */
 	public function getAllOfType($type) {
 		return empty($this->packages[$type]) ? array() : $this->packages[$type];
@@ -304,33 +385,45 @@ class PackageManager implements Common\iManager
 
 	/**
 	 * Returns indexed array of package type strings.
+	 * 
+	 * @return array Indexed array of package types.
 	 */
 	public function getTypes() {
 		return array_keys($this->packages);
 	}
+	
+	/**
+	 * Parses a conditional package string and extracts the delimeter and value.
+	 * 
+	 * @param string $str Conditional string (e.g. "php<5.5" -> "PHP versions less than 5.5")
+	 * @param scalar &$value Set to value found (e.g. in example above, value is "5.5")
+	 * @return string|null Operator string if found, otherwise null.
+	 */
+	protected function findDelimeter($str, &$value = null) {
+			
+		$operators = array('<=', '>=', '!=', '<', '=', '>');
+		
+		foreach ( $operators as $op ) {
+			if (false !== $pos = strpos($str, $op)) {
+				$value = substr($str, $pos + strlen($op));
+				return $op;
+			}
+		}
+		
+		return null;
+	}
 
 	/**
 	 * Parses array of conditionally loaded packages from config array.
+	 * 
+	 * @param array $packages Array of package settings from config.
+	 * @return void
 	 */
 	protected function parseConditionalPackages(array $packages) {
 
-		$operators = array('<=', '>=', '!=', '<', '=', '>');
-
-		$findDelim = function($str, &$value = null) use ($operators) {
-
-			foreach ( $operators as $op ) {
-				if (false !== $pos = strpos($str, $op)) {
-					$value = substr($str, $pos + strlen($op));
-					return $op;
-				}
-			}
-			return null;
-		};
-
 		foreach ( $packages as $condition => $_packages ) {
 
-			$val = '';
-			$oper = $findDelim($condition, $val);
+			$oper = $this->findDelimeter($condition, $value);
 
 			if (null === $oper) {
 				continue;
@@ -339,31 +432,31 @@ class PackageManager implements Common\iManager
 			switch(substr($condition, 0, 3)) {
 
 				case 'php' :
-					if (version_compare(PHP_VERSION, $val, $oper) > 0) {
+					
+					if (version_compare(PHP_VERSION, $value, $oper) > 0) {
 						// PHP version is outside given range
 						$this->addPackages($_packages, true);
 					}
-
 					break;
 
 				case 'ext' :
-					if ('!=' === $oper && ! extension_loaded($val)) {
+					
+					if ('!=' === $oper && ! extension_loaded($value)) {
 						// Extension is not loaded
 						$this->addPackages($_packages, true);
 					}
-
 					break;
 			}
 		}
 	}
 
 	/**
-	 * used with list($type, $id)
+	 * Parses a UID into a 2-element aray of Type and ID.
 	 *
-	 * @param array $args	Arguments.	If only 1 element is present, it(the string) is
-	 * parsed
+	 * @param array $args	Arguments.	If only 1 element is present, it(the string) is parsed
 	 * 									as a dot-separated type/ID pair. Otherwise, the first
 	 * 									two items will be used as the type and ID, respectively.
+	 * @return array Indexed array of package Type and ID.
 	 */
 	protected function parseUid(array $args) {
 

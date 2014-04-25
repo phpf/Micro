@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * @package PHP
+ */
 namespace {
 	
 	if (! interface_exists('JsonSerializable')) {
@@ -13,6 +15,9 @@ namespace {
 	
 }
 
+/**
+ * @package Phpf\Common
+ */
 namespace Phpf\Common {
 	
 	use Serializable;

@@ -10,10 +10,22 @@ class App implements ArrayAccess, Countable {
 	
 	const DEFAULT_ID = 'app';
 	
+	/**
+	 * Application namespace.
+	 * @var string
+	 */
 	public $namespace;
 	
+	/**
+	 * Application component objects/classes.
+	 * @var array
+	 */
 	protected $components = array();
 	
+	/**
+	 * App instances.
+	 * @var array
+	 */
 	protected static $instances = array();
 	
 	/**
@@ -35,26 +47,44 @@ class App implements ArrayAccess, Countable {
 	/**
 	 * Set up configuration settings.
 	 * 
+	 * @param string $root Root filesystem directory for entire application.
 	 * @param string $conf_file User config file.
 	 * @return array Configuration settings.
 	 */
-	public static function configure($conf_file) {
+	public static function configure($root, $config_file = null) {
 		
-		$user_config = require $conf_file;
+		$root = rtrim(realpath($root), '/\\') . DIRECTORY_SEPARATOR;
 		
-		if (! is_array($user_config)) {
-			throw new \RuntimeException("User configuration file must return array.");
+		if (! isset($config_file)) {
+			$config_file = $root.'config.php';
+		}
+		
+		$userConfig = require $config_file;
+		
+		if (! is_array($userConfig)) {
+			throw new RuntimeException("User configuration file must return array.");
 		}
 		
 		// Merge user config and defaults
 		$config = array_replace_recursive(array(
-			'root' 		=> './', // root directory path
+			'root'		=> './', // want this at the top
 			'namespace'	=> 'App',
-			'charset'	=> 'UTF-8',
-			'timezone'	=> 'UTC',
-			'debug' 	=> false,
-			'dirs' => array(
-				'app'		=> 'app', // relative to root
+			'charset'	=> 'UTF-8',	// @used-by \PhpfCommon\Env
+			'timezone'	=> 'UTC',	// @used-by \PhpfCommon\Env
+			'debug' 	=> false, 	// @used-by \PhpfCommon\Env
+			'ini' => array( 		// @used-by \PhpfCommon\Env
+				/**
+				 * This ini setting makes sure that objects get unserialized with methods 
+				 * when its class has not yet been (auto)loaded. It simply calls 
+				 * spl_autoload_call() with the class of the object being unserialized.
+				 * 
+				 * Note this is potentially dangerous (i.e. may produce errors) if not all your 
+				 * classes are autoloaded, as it's invoked for all (object) unserialize operations.
+				 */
+				'unserialize_callback_func' => 'spl_autoload_call',
+			),
+			'dirs' => array( // @used-by \PhpfCommon\Env
+				'app'		=> 'app', // application path, relative to root
 				'library'	=> 'app/library',
 				'module'	=> 'app/modules',
 				'views'		=> 'app/views',
@@ -63,36 +93,26 @@ class App implements ArrayAccess, Countable {
 			),
 			'aliases' => array(
 				'App'			=> 'Phpf\App',
-				'Config'		=> 'Phpf\Config', // hardcoded in functions.php ?
+				'Config'		=> 'Phpf\Config',
 				'Cache'			=> 'Phpf\Cache', // hardcoded in functions.php
 				'Session'		=> 'Phpf\Session',
 				'Request'		=> 'Phpf\Request',
 				'Response'		=> 'Phpf\Response',
-				'Router'		=> 'Phpf\Router', // hardcoded in functions.php ?
-				'Database'		=> 'Phpf\Database', // hardcoded in functions.php
+				'Router'		=> 'Phpf\Router',
+				'Database'		=> 'Phpf\Database',
 				'Filesystem'	=> 'Phpf\Filesystem',
 				'Events'		=> 'Phpf\EventContainer',
-				// might be helpful
 				'Views'			=> 'Phpf\ViewManager',
 				'Packages'		=> 'Phpf\PackageManager',
-				// might be unnecessary...
-				'Registry' 		=> 'Phpf\Common\StaticRegistry',
 				'Helper'		=> 'Phpf\Common\Helper',
-				'Log'			=> 'Phpf\Log\Log',
+				'Registry' 		=> 'Phpf\Common\StaticRegistry', // might be unnecessary...
+				'Log'			=> 'Phpf\Log\Log', // might be unnecessary...
 			),
-			'unserialize_callback_func' => 'spl_autoload_call',
-		), $user_config);
+		), $userConfig);
 		
-		/** Set unserialize_callback_func */
-		if (! empty($config['unserialize_callback_func'])) {
-			/**
-			 * Make sure objects get unserialized with methods when its class has 
-			 * not yet been autoloaded.
-			 * Note this is potentially dangerous if not all classes are autoloaded.
-			 */
-			ini_set('unserialize_callback_func', $config['unserialize_callback_func']);
-		}
-
+		// set root filesystem path
+		$config['root'] = $root;
+		
 		return $config;
 	}
 
@@ -102,7 +122,7 @@ class App implements ArrayAccess, Countable {
 	 * @param array|ArrayAccess $config Configuration array/object.
 	 * @throws RuntimeException If $config is not array or ArrayAccess, or if 
 	 * 							App instance with given ID already exists.
-	 * @return \App
+	 * @return \Phpf\App
 	 */
 	public static function createFromArray($config) {
 		
@@ -127,18 +147,45 @@ class App implements ArrayAccess, Countable {
 	 * @return void
 	 */
 	public static function loadFunctions() {
-		require_once __DIR__ . '/functions.php';
+		require_once __DIR__ . '/functions.php'; // file should be on same dir level
+	}
+	
+	/**
+	 * Include a file with the application instance within the local scope.
+	 * 
+	 * The application will be available in the file as the variable "$app".
+	 * This method is static to avoid having to use a closure in an object 
+	 * context (which runs about twice as slow).
+	 * 
+	 * @param string $file File to include.
+	 * @param boolean $check_exists Whether to check if the file exists prior to loading. Default true.
+	 * @return boolean True if file was included, false if it was not.
+	 */
+	public static function includeInScope($file, $check_exists = true) {
+		if (! $check_exists || file_exists($file)) {
+			$app = static::instance();
+			include $file;
+			return true;
+		}
+		return false;
 	}
 	
 	/**
 	 * Construct the application
 	 * 
 	 * @param array|ArrayAccess Config array/object
+	 * @return void
 	 */
 	protected function __construct($config) {
-		
+			
 		// set app namespace
-		$this->setNamespace($config['namespace']);
+		$this->namespace = trim($config['namespace'], '\\');
+		
+		/**
+		 * Namespace for application resources (e.g. models, controllers, etc.)
+		 * @var string
+		 */
+		define('APP_NAMESPACE', $this->namespace);
 		
 		// Env
 		$this->set('env', $env = new Common\Env($config['root']));
@@ -146,9 +193,10 @@ class App implements ArrayAccess, Countable {
 		$env->setCharset($config['charset']);
 		$env->setTimezone($config['timezone']);
 		$env->setDebug($config['debug']);
+		$env->setIni($config['ini']);
 		
-		foreach($config['dirs'] as $dir) {
-			$env->addDirectory($dir, null, true);
+		foreach($config['dirs'] as $name => $dir) {
+			$env->addDirectory($dir, $name, true);
 		}
 		
 		$env->configurePHP();
@@ -163,19 +211,6 @@ class App implements ArrayAccess, Countable {
 		$autoloader = Common\Autoloader::instance($this->namespace);
 		$autoloader->setPath(dirname(APP));
 		$autoloader->register();
-	}
-	
-	public function setNamespace($namespace) {
-			
-		$this->namespace = trim($namespace, '\\');
-		
-		/**
-		 * Application namespace
-		 * @var string
-		 */
-		define('APP_NAMESPACE', $this->namespace);
-		
-		return $this;
 	}
 	
 	/**
@@ -194,10 +229,13 @@ class App implements ArrayAccess, Countable {
 	 * @return string Path to given arg or base path.
 	 */
 	public function getPath($to = null) {
+			
 		$paths = $this->get('config')->get('paths');
+		
 		if (isset($to)) {
 			return isset($paths[$to]) ? $paths[$to] : null;
 		}
+		
 		return $paths['app'];
 	}
 	
@@ -224,12 +262,12 @@ class App implements ArrayAccess, Countable {
 		if (! isset($this->components[$name]))
 			return null;
 		
-		if (is_object($this->components[$name]))
-			return $this->components[$name];
+		if (is_string($this->components[$name])) {
+			$class = $this->components[$name];
+			return $class::instance();
+		}
 		
-		$class = $this->components[$name];
-		
-		return $class::instance();
+		return $this->components[$name];
 	}
 	
 	/**
@@ -272,7 +310,6 @@ class App implements ArrayAccess, Countable {
 	public function setSingleton($name, $class) {
 		
 		if (! method_exists($class, 'instance')) {
-			$class = is_object($class) ? get_class($class) : $class;
 			trigger_error("Singletons must have 'instance()' method - Class $class does not.");
 			return null;
 		}
@@ -301,7 +338,7 @@ class App implements ArrayAccess, Countable {
 		// get driver class
 		if (isset($conf['driver-class'])) {
 			$class = $conf['driver-class'];
-		} elseif (isset($conf['driver'])) {
+		} else if (isset($conf['driver'])) {
 			$class = 'Phpf\\CacheDriver\\'.ucfirst($conf['driver']).'Driver';
 		}
 		
@@ -380,8 +417,11 @@ class App implements ArrayAccess, Countable {
 	
 	/**
 	 * Returns a component that matches the called method.
+	 * @deprecated
 	 */
 	public function __call( $func, $args ){
+		
+		trigger_error("Calling components as methods is deprecated on Phpf\App - use properties instead.", E_USER_DEPRECATED);
 		
 		if (isset($this->components[$func])) {
 			return $this->get($func);

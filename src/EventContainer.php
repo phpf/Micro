@@ -4,19 +4,13 @@ namespace Phpf;
 
 use Phpf\Event\Listener;
 use Phpf\Event\Event;
+use OutOfBoundsException;
+use InvalidArgumentException;
 
 /**
  * Event container.
  * 
  * Class for binding and triggering events.
- * 
- * Public methods:
- * @method on()				Bind a callback to an event.
- * @method trigger()		Triggers an event with arguments.
- * @method triggerArray()	Triggers an event with an array of arguments.
- * @method event()			Returns a completed event object.
- * @method result()			Returns the array of results returned from a completed event.
- * @method orderBy()		Set the priority ordering; default is low to high.
  */
 class EventContainer
 {
@@ -131,11 +125,12 @@ class EventContainer
 	 *
 	 * @param int $order One of self::LOW_TO_HIGH (1) or self::HIGH_TO_LOW (2)
 	 * @return $this
+	 * @throws OutOfBoundsException if order is not one of the class constants.
 	 */
 	public function orderBy($order) {
 
 		if ($order != self::LOW_TO_HIGH && $order != self::HIGH_TO_LOW) {
-			throw new \OutOfBoundsException("Invalid sort order.");
+			throw new OutOfBoundsException("Invalid sort order.");
 		}
 
 		$this->order = (int)$order;
@@ -158,7 +153,7 @@ class EventContainer
 
 			if (! is_string($event)) {
 				$msg = "Event must be string or instance of Event - ".gettype($event)." given.";
-				throw new \InvalidArgumentException($msg);
+				throw new InvalidArgumentException($msg);
 			}
 
 			$event = new Event($event);

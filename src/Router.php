@@ -5,15 +5,46 @@
 
 namespace Phpf;
 
-use Phpf\EventContainer;
 use Phpf\Reflection\Callback;
 use Phpf\Route\Route;
 
 class Router implements Common\iEventable
 {
+	
+	/**
+	 * Event container object.
+	 * @var \Phpf\EventContainer
+	 */
+	protected $events;
+	
+	/**
+	 * Request object.
+	 * @var \Phpf\Request
+	 */
+	protected $request;
 
+	/**
+	 * Response object.
+	 * @var \Phpf\Response
+	 */
+	protected $response;
+
+	/**
+	 * Matched route object.
+	 * @var \Phpf\Route\Route
+	 */
+	protected $route;
+	
+	/**
+	 * Route objects.
+	 * @var array
+	 */
 	protected $routes = array();
 
+	/**
+	 * Route query variables.
+	 * @var array
+	 */
 	protected $vars = array(
 		'segment'	=> '([^_/][^/]+)', 
 		'words'		=> '(\w\-+)', 
@@ -21,15 +52,12 @@ class Router implements Common\iEventable
 		'str'		=> '(.+?)', 
 		'any'		=> '(.?.+?)', 
 	);
-
-	protected $request;
-
-	protected $response;
-
-	protected $route;
-
-	protected $events;
-
+	
+	/**
+	 * Constructor - takes Phpf\EventContainer as only argument by reference.
+	 * 
+	 * @param \Phpf\EventContainer &$events Events container.
+	 */
 	public function __construct(EventContainer &$events) {
 		
 		$this->events = &$events;
@@ -44,7 +72,11 @@ class Router implements Common\iEventable
 	}
 	
 	/**
-	 * Matches and routes a request URI.
+	 * Matches a request URI and calls its method.
+	 * 
+	 * @param \Phpf\Request &$request Request object.
+	 * @param \Phpf\Response &$response Response object.
+	 * @return void
 	 */
 	public function dispatch(Request &$request, Response &$response) {
 		
@@ -58,47 +90,30 @@ class Router implements Common\iEventable
 			$this->timer('stop');
 			
 			if (isset($this->caught_by_endpoint)) {
-				return $this->caught_by_endpoint->invoke($request, $response, $this);
+				return $this->caught_by_endpoint;
 			}
 			
-			$reflect = new Callback($this->route->getCallback());
-			$this->trigger('dispatch:before', $this->route, $request, $response);
-
-			try {
-				// match request params with callback params, fill in defaults
-				$reflect->reflectParameters($request->getParams());
-				
-			} catch (\Phpf\Reflection\Exception\MissingParam $e) {
-				// missing a required parameter, throw 404
-				$msg = str_replace('reflection', 'required route', $e->getMessage());
-				$exception = new Route\Exception\MissingParam($msg);
-				$this->error(404, $exception, $this->route);
-			}
+			return $this->route;
 			
-			// Invoke the callback
-			$reflect->invoke();
-			
-			// Allow the route to be caught before being sent
-			$this->trigger('dispatch', $this->route, $request, $response);
-			
-			// Do post-dispatching actions
-			$this->trigger('dispatch:after', $this->route, $request, $response);
-		
 		} else {
 			// Send 404 with UnknownRoute exception
-			$this->error(404, new Route\Exception\UnknownRoute('Unknown route'), null);
+			$this->error(404, new \Phpf\Route\Exception\UnknownRoute('Unknown route'), null);
 		}
 	}
 
 	/**
-	 * Gets Request object
+	 * Gets Request object.
+	 * 
+	 * @return \Phpf\Request
 	 */
 	public function getRequest() {
 		return $this->request;
 	}
 
 	/**
-	 * Gets Response object
+	 * Gets Response object.
+	 * 
+	 * @return \Phpf\Response
 	 */
 	public function getResponse() {
 		return $this->response;
@@ -106,6 +121,8 @@ class Router implements Common\iEventable
 
 	/**
 	 * Gets matched Route object
+	 * 
+	 * @return \Phpf\Route\Route
 	 */
 	public function getRoute() {
 		return $this->route;
@@ -114,6 +131,9 @@ class Router implements Common\iEventable
 	/**
 	 * Returns array of route objects, their URI as the key.
 	 * Can return a specified priority group, otherwise returns all.
+	 * 
+	 * @param int|null $priority Priority of routes to return, or null to return all (default).
+	 * @return array Route objects.
 	 */
 	public function getRoutes($priority = null) {
 		if ($priority !== null)
@@ -122,7 +142,10 @@ class Router implements Common\iEventable
 	}
 
 	/**
-	 * Returns regex for a query var
+	 * Returns regex for a query var name.
+	 * 
+	 * @param string $key Query var name.
+	 * @return string Regex for var if set, otherwise empty string.
 	 */
 	public function getRegex($key) {
 		return isset($this->vars[$key]) ? $this->vars[$key] : '';
@@ -130,6 +153,8 @@ class Router implements Common\iEventable
 
 	/**
 	 * Returns array of query vars and regexes
+	 * 
+	 * @return array Associative array of query var names and regexes.
 	 */
 	public function getVars() {
 		return $this->vars;
@@ -138,8 +163,9 @@ class Router implements Common\iEventable
 	/**
 	 * Adds query var and regex
 	 *
-	 * @param string $name The query var name
-	 * @param string $regex The var's regex
+	 * @param string $name The query var name.
+	 * @param string $regex The var's regex.
+	 * @return $this
 	 */
 	public function addVar($name, $regex) {
 		$this->vars[$name] = $regex;
@@ -148,6 +174,9 @@ class Router implements Common\iEventable
 
 	/**
 	 * Adds array of query vars and regexes
+	 * 
+	 * @param array $vars Associative array of var name/regex pairs.
+	 * @return $this
 	 */
 	public function addVars(array $vars) {
 		foreach ( $vars as $name => $regex ) {
@@ -157,7 +186,14 @@ class Router implements Common\iEventable
 	}
 
 	/**
-	 * Adds a single route
+	 * Creates and adds a single route object.
+	 * 
+	 * @see \Phpf\Route\Route
+	 * 
+	 * @param string $uri URI path.
+	 * @param array $args Route arguments passed to constructor.
+	 * @param int $priority Route priority. Default 10.
+	 * @return $this
 	 */
 	public function addRoute($uri, array $args, $priority = 10) {
 		$route = new Route($uri, $args);
@@ -175,6 +211,7 @@ class Router implements Common\iEventable
 	 * @param int $priority The group priority level
 	 * @param string $position The routes' position within the group, if exists
 	 * already
+	 * @return boolean True, always.
 	 */
 	public function addRoutes(array $routes, $priority = 10) {
 
@@ -193,7 +230,9 @@ class Router implements Common\iEventable
 		return true;
 	}
 
-	/** @alias addRoute() */
+	/** 
+	 * &Alias of addRoute() 
+	 */
 	public function route($uri, array $args, $priority = 10) {
 		return $this->addRoute($uri, $args, $priority);
 	}
@@ -203,6 +242,7 @@ class Router implements Common\iEventable
 	 * 
 	 * @param string $path Endpoint path
 	 * @param Closure $callback Closure that returns the routes
+	 * @return $this
 	 */
 	public function endpoint($path, \Closure $callback) {
 		$this->endpoints[$path] = $callback;
@@ -210,7 +250,7 @@ class Router implements Common\iEventable
 	}
 
 	/**
-	 * Set a controller class to use for the current endpoint.
+	 * Set a controller class to use for the endpoint currently executing.
 	 * 
 	 * @see matchEndpoints()
 	 * 
@@ -219,15 +259,6 @@ class Router implements Common\iEventable
 	 */
 	public function setController($class) {
 		$this->ep_controller_class = $class;
-		return $this;
-	}
-
-	/**
-	 * Adds an extension to strip from URIs
-	 * @return $this
-	 */
-	public function stripExtension($extension) {
-		$this->strip_extensions .= '|'.ltrim($extension, '.');
 		return $this;
 	}
 
@@ -276,23 +307,11 @@ class Router implements Common\iEventable
 	}
 
 	/**
-	 * Timer
-	 */
-	protected function timer($start_stop) {
-			
-		$this->timer[$start_stop] = microtime(true);
-			
-		if (function_exists('timer_start')) {
-			if ('start' === $start_stop) {
-				timer_start('router');
-			} else if ('stop' === $start_stop) {
-				timer_end('router');
-			}
-		}
-	}
-
-	/**
 	 * Matches request URI to a route.
+	 * 
+	 * Tries endpoint routes first, then static routes.
+	 * 
+	 * @return boolean True if match, otherwise false.
 	 */
 	protected function match() {
 
@@ -306,8 +325,10 @@ class Router implements Common\iEventable
 		}
 
 		if (! empty($this->routes)) {
+			// sort priority groups by descending priority
 			ksort($this->routes);
 			foreach ( $this->routes as $group ) {
+				// iterate through the routes in each group
 				foreach ( $group as $Route ) {
 					if ($this->matchRoute($Route, $uri, $method)) {
 						return true;
@@ -321,41 +342,60 @@ class Router implements Common\iEventable
 
 	/**
 	 * Searches endpoints for route match.
+	 * 
+	 * @param string $uri Request URI.
+	 * @param string $http_method Request HTTP method.
+	 * @return boolean True if endpoint route matched, otherwise false.
 	 */
 	protected function matchEndpoints($uri, $http_method) {
 
 		foreach ( $this->endpoints as $path => $closure ) {
-
+				
+			// check for endpoint match
 			if (0 === strpos($uri, $path)) {
 
-				$this->routes[$path] = array();
+				// execute the closure to return the routes
 				$routes = $closure($this);
 				
+				// allow endpoints to return an object instead of an array of routes, 
+				// which will exit the routing process and subsequently return the object.
+				// @see Phpf\Router::dispatch()
 				if (is_object($routes)) {
 					$this->caught_by_endpoint = $routes;
 					return true;
 				}
-
+				
+				$this->routes[$path] = array();
+				
+				// iterate through the array and create the route objects
 				foreach ( $routes as $epUri => $array ) {
 					
+					// set action from path if author is lazy
 					if (! isset($array['action'])) {
 						if (ctype_alpha($slug = trim($epUri, '/'))) {
 							$array['action'] = $slug;
 						} else {
-							continue;
+							continue; // non-alpha paths don't make good methods
 						}
 					}
 					
-					if (isset($this->ep_controller_class) && ! isset($array['controller'])) {
-						// Closure has set a controller class to use for all routes.
-						$array['controller'] = $this->ep_controller_class;
-						$array['callback'] = array($array['controller'], $array['action']);
+					// set controller if missing
+					if (! isset($array['controller'])) {
+						if (isset($this->ep_controller_class)) {
+							// Closure has set a controller class to use for all routes.
+							$array['controller'] = $this->ep_controller_class;
+							$array['callback'] = array($array['controller'], $array['action']);
+						} else {
+							continue; // I'm not a magician
+						}
 					}
 
 					$array['endpoint'] = trim($path, '/');
-
+					
+					// create the route object
 					$route = $this->routes[$path][$path.$epUri] = new Route($path.$epUri, $array);
-
+					
+					// match the route
 					if ($this->matchRoute($route, $uri, $http_method)) {
 						return true;
 					}
@@ -373,17 +413,24 @@ class Router implements Common\iEventable
 	 * If match, sets Router property $route and assembles the matched query
 	 * vars and adds them to Request property $path_params. However, if
 	 * the HTTP method is not allowed, a 405 Status error is returned.
+	 * 
+	 * @param Route $route The \Phpf\Route\Route object.
+	 * @param string $uri Request URI.
+	 * @param string $http_method Request HTTP method.
+	 * @return boolean True if match and set up, otherwise false.
 	 */
 	protected function matchRoute(Route $route, $uri, $http_method) {
 
 		$qvs = array();
 		$route_uri = $this->parseRoute($route->uri, $qvs);
-
+		
 		if (preg_match('#^/?'.$route_uri.'/?$#i', $uri, $route_vars)) {
-
+			
+			// check if HTTP method is allowed
 			if (! $route->isMethodAllowed($http_method)) {
-
-				$exception = new Route\Exception\HttpMethodNotAllowed;
+				
+				// send 405 with the 'Allow' header
+				$exception = new \Phpf\Route\Exception\HttpMethodNotAllowed;
 				$exception->setRequestedMethod($http_method);
 				$exception->setAllowedMethods($route->getMethods());
 
@@ -408,6 +455,10 @@ class Router implements Common\iEventable
 
 	/**
 	 * Parses a route URI, changing query vars to regex and adding keys to $vars.
+	 * 
+	 * @param string $uri URI to parse.
+	 * @param array &$vars Associative array of vars parsed from URI.
+	 * @return string URI with var placeholders replaced with their corresponding regex.
 	 */
 	protected function parseRoute($uri, &$vars = array()) {
 		
@@ -447,17 +498,22 @@ class Router implements Common\iEventable
 	}
 
 	/**
-	 * Matches filetypes at the end of a string (usually URI) and removes them.
+	 * Internal timer stop/start.
+	 * 
+	 * @param string One of 'start' or 'stop'.
+	 * @return void
 	 */
-	protected function stripExtensions($string, &$match = null) {
-
-		if (preg_match("/[\.|\/]($this->strip_extensions)/", $string, $matches)) {
-			$match = $matches[1];
-			// remove extension and separator
-			$string = str_replace(substr($matches[0], 0, 1).$match, '', $string);
+	protected function timer($start_stop) {
+			
+		$this->timer[$start_stop] = microtime(true);
+			
+		if (function_exists('timer_start')) {
+			if ('start' === $start_stop) {
+				timer_start('router');
+			} else if ('stop' === $start_stop) {
+				timer_end('router');
+			}
 		}
-
-		return $string;
 	}
 
 }
