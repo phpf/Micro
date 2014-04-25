@@ -6,8 +6,8 @@ PHP micro-framework using Phpf components.
 ####Goals
 
  * Be ridiculously easy to understand and use
- * Minimize dependencies
- * Excellent "out-of-the-box" performance
+ * Excellent baseline performance
+ * Minimal dependencies
 
 ####Requirements
 
@@ -18,10 +18,13 @@ PHP micro-framework using Phpf components.
 
 ###Overview
 
-Micro is a minimal "full-stack" framework for small yet potentially complex web applications. While PHP doesn't exactly need another framework, "micro" or otherwise, I found the currently available options too limited or prescriptive.
+"Micro" (working title) is a minimal framework for small yet potentially complex web applications. PHP doesn't exactly need another framework, "micro" or otherwise, yet I found the currently available options too limited or prescriptive.
 
-You don't need a degree in software engineering to understand Micro. Names (for classes, methods, variables, etc) are meant to clearly convey their meaning, so no obscure iterateSubInvokable() or such nonsense.
-
+####Philosophy
+The main points:
+ * _Write PHP like PHP_ - a framework should not feel like another language
+ * _Short_ - a bigger codebase does not help you write better code
+ * _Simple_ - developers should spend their time developing, not learning a framework
 
 ###Getting Started
 
@@ -59,7 +62,7 @@ The returned object, `$app`, is an instance of `Phpf\App`. At this point, the ob
 To set components, use the app object's `set()` method, where the first parameter is the name, and the second parameter is the object or class name (string) - if given a class, the component is interpreted as a singleton and will be returned using `$class::instance()` (hence, it must implement the `instance()` method statically to return the object instance). Otherwise, the component is simply stored as an object.
 
 ######The Cache!
-The above holds true for all components except the cache. The cache requires a driver (one for XCache comes pre-packaged), which the user can provide by setting the configuration item `cache['driver-class']` (e.g. `$config['cache']['driver-class'] = 'My_SomeCacheEngine_Driver'`). The driver is instantiated when the cache is started using `$app->startCache()`. If you'd like to use your own (singleton) cache instead of `Phpf\Cache`, pass the string name (or just use an alias `Cache`!) to the `startCache()` method (e.g. `$app->startCache('My_Cache')`).
+The above holds true for all components except the cache. The cache requires a driver (one for XCache comes pre-packaged), which the user can provide by setting the configuration item `cache['driver-class']` (e.g. `$config['cache']['driver-class'] = 'My_SomeCacheEngine_Driver'`). The driver is instantiated when the cache is started using `$app->startCache()`. If you'd like to use your own (singleton) cache instead of `Phpf\Cache`, pass the string name (or just use an alias `Cache`) to the `startCache()` method.
 
 Use the aliases to instantiate component object (see `Phpf\App::configure()` for a listing of default component aliases). This allows for easy swapping of component classes without changing a bunch of files.
 
